@@ -5942,6 +5942,7 @@
       // byte-for-byte what the old client always sent. A logged-in account
       // sends [255, unicode(uuid|gameToken), 0, 0].
       const str = Account.buildLoginString(Account.uuid);
+      console.log("Drag+ Login packet: " + (str ? (str.length > 24 ? str.slice(0, 24) + "..." : str) : "guest"));
       if (!str) {
         const px = new Uint8Array([255, 0, 0]);
         WsConnection.send(px, ahn);
@@ -6213,13 +6214,22 @@
         return;
       }
       fetch("https://3rb.io/api/auth/game-token", { credentials: "include" })
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) {
+            Notifications.warn("Login", "Game token failed (HTTP " + r.status + ") - chat may stay locked");
+            throw new Error("game-token status " + r.status);
+          }
+          return r.json();
+        })
         .then((d) => {
           const tk = d && d.data && d.data.token;
           if (tk) {
             this.gameToken = tk;
             this.gameTokenAt = Date.now();
+            Notifications.command("Login", "Game token ready");
             PacketSender.resendLogin();
+          } else {
+            Notifications.warn("Login", "Game token: no token in response");
           }
         })
         .catch(() => {});
