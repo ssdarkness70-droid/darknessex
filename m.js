@@ -752,7 +752,7 @@
       $("#skin").val(ze.skin);
       $("#skin2").val(ze.skin2 || "");
       $("#arbSkin").val(ze.arbSkin);
-      Player.nick = "" === ze.nick ? "Unnamed Cell" : ze.nick;
+      Player.nick = "" === ze.nick ? "An unnamed cell" : ze.nick;
       Player.skin = ze.skin;
       Player.skin2 = ze.skin2 || "";
       Storage.set("profiles", "profile" + this.selected, ze);
@@ -775,7 +775,7 @@
       }
       ht.nick = jl;
       Storage.set("profiles", "profile" + this.selected, ht);
-      Player.nick = "" === jl ? "Unnamed Cell" : jl;
+      Player.nick = "" === jl ? "An unnamed cell" : jl;
     }
     static ["setarbSkin"]() {
       var uu = $("#arbSkin").val();
@@ -5544,6 +5544,8 @@
         this.handleParty(aam);
       } else if (88 === ahy && 1 === ii) {
         this.handleLevel(aam);
+      } else if (154 === ahy && 1 === ii) {
+        this.handleSweets(aam);
       }
       if (86 === ahy && 1 === ii) {
         this.handleChat(aam);
@@ -5574,6 +5576,15 @@
       RelayWs.updateRoom();
       if (aia && PacketSender.chekConnection(2)) {
         PacketSender.joinParty(fg, 2);
+      }
+    }
+    static ["handleSweets"](akl) {
+      // Opcode 154: sweet pickup (uint16 count + x/y). Track the running
+      // total for the status line; refresh is throttled by updateUI call.
+      const gained = akl.readUInt16();
+      if (0 < gained) {
+        Account.sweets += gained;
+        Account.updateUI();
       }
     }
     static ["handleLevel"](ajz) {
@@ -6071,7 +6082,7 @@
       if (this.chekConnection(n) && ((1 === n && !Player._isAlive) || (2 === n && !Player._isAlive2))) {
         Camera.isSpectating = false;
         if ("" === Player.nick) {
-          Player.nick = "Unnamed cell";
+          Player.nick = "An unnamed cell";
         }
         let xt = unescape(encodeURIComponent(Player.nick));
         let h = unescape(encodeURIComponent("free/" + TeamList.arbSkin));
@@ -6169,6 +6180,12 @@
       this.xp = -1;
       this.level = 0;
       this.levelAnnounced = false;
+      this.coins = 0;
+      this.sweets = 0;
+      this.vipEndAt = null;
+      this.xpBoost = null;
+      this.massBoost = null;
+      this._xpPoll = null;
       window.authResponse = (res) => {
         try {
           this.onAuthResponse(res);
@@ -6182,6 +6199,7 @@
       if (this.loggedIn) {
         this.refreshGameToken();
         this.loadLevels();
+        this.startXpPoll();
       }
     }
     static get ["loggedIn"]() {
@@ -6227,6 +6245,11 @@
       this.gameToken = null;
       this.gameTokenAt = 0;
       this.levels = (e && e.Shop && e.Shop.Levels) || this.levels;
+      this.coins = parseInt(e && e.Coins) || 0;
+      this.sweets = parseInt(e && e.Sweets) || 0;
+      if (e && e.vipEndAt) this.vipEndAt = e.vipEndAt;
+      if (e && e["XP Boost"]) this.xpBoost = e["XP Boost"];
+      if (e && e["Mass Boost"]) this.massBoost = e["Mass Boost"];
       this.refreshGameToken();
       this.updateUI();
       PacketSender.resendLogin();
@@ -6235,6 +6258,7 @@
         this.setXp(axp);
       }
       this.loadLevels();
+      this.startXpPoll();
     }
     static ["refreshGameToken"]() {
       if (!this.loggedIn) {
@@ -6273,21 +6297,69 @@
         this.announceLevel();
         return;
       }
+      this.refreshAccountData();
+    }
+    static ["startXpPoll"]() {
+      // Lightweight live account refresh (one small request every 40s) so the
+      // XP/level updates while playing without needing a logout/login. Safe
+      // for guests: only runs while logged in. Kept tiny to avoid any lag.
+      if (this._xpPoll || !this.loggedIn) return;
+      this._xpPoll = setInterval(() => {
+        if (!this.loggedIn) {
+          this.stopXpPoll();
+          return;
+        }
+        this.refreshAccountData();
+      }, 40000);
+    }
+    static ["stopXpPoll"]() {
+      if (this._xpPoll) {
+        clearInterval(this._xpPoll);
+        this._xpPoll = null;
+      }
+    }
+    static ["refreshAccountData"]() {
+      if (!this.loggedIn) return;
       fetch("https://3rb.io/api/auth/me", { credentials: "include" })
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error("status " + r.status))))
         .then((d) => {
           const body = d && d.data ? d.data : d;
-          const lv = body && body.Shop && body.Shop.Levels;
-          if (lv && lv.length) {
-            this.levels = lv;
-            const bxp = parseInt(body.XP);
-            if (!isNaN(bxp) && 0 <= bxp) {
-              this.setXp(bxp);
-            }
+          if (body) {
+            this.applyAccountData(body);
           }
-          this.announceLevel();
         })
         .catch(() => {});
+    }
+    static ["applyAccountData"](body) {
+      if (body.Shop && body.Shop.Levels && body.Shop.Levels.length) {
+        this.levels = body.Shop.Levels;
+      }
+      const xp = parseInt(body.XP);
+      if (!isNaN(xp) && 0 <= xp) {
+        this.setXp(xp);
+      }
+      const coins = parseInt(body.Coins);
+      if (!isNaN(coins) && 0 <= coins) {
+        this.coins = coins;
+      }
+      const sweets = parseInt(body.Sweets);
+      if (!isNaN(sweets) && 0 <= sweets) {
+        this.sweets = sweets;
+      }
+      if (body.vipEndAt) this.vipEndAt = body.vipEndAt;
+      if (body["XP Boost"]) this.xpBoost = body["XP Boost"];
+      if (body["Mass Boost"]) this.massBoost = body["Mass Boost"];
+      this.updateUI();
+    }
+    static ["isVip"]() {
+      if (!this.vipEndAt) return false;
+      const t = new Date(this.vipEndAt).getTime();
+      return !isNaN(t) && t > Date.now();
+    }
+    static ["boostActive"](val) {
+      if (!val) return false;
+      const t = new Date(val).getTime();
+      return isNaN(t) || t > Date.now();
     }
     static ["levelForXp"](xp) {
       let cur = null;
@@ -6309,7 +6381,15 @@
       if (!cur) return;
       this.level = cur.Level;
       if (wasKnown && oldLevel && cur.Level > oldLevel) {
-        Notifications.command("Level", "Level Up! You reached level " + cur.Level);
+        const coins = parseInt(cur.Coins);
+        if (0 < coins) {
+          this.coins += coins;
+          this.updateUI();
+        }
+        Notifications.command(
+          "Level",
+          "Level Up! You reached level " + cur.Level + (0 < coins ? " (+" + coins.toLocaleString() + " Coins)" : "")
+        );
       }
       this.announceLevel();
     }
@@ -6320,6 +6400,7 @@
       Notifications.command("Level", "Your level: " + this.level + " (" + this.xp + " XP)");
     }
     static ["logout"]() {
+      this.stopXpPoll();
       this.uuid = "logout";
       this.gameToken = null;
       PacketSender.resendLogin();
@@ -6345,6 +6426,7 @@
       this.gameTokenAt = 0;
       if (this.loggedIn) {
         this.refreshGameToken();
+        this.startXpPoll();
       }
       this.updateUI();
       PacketSender.resendLogin();
@@ -6354,17 +6436,35 @@
       // rel="opener") so the browser opens the Auth.php popup itself - no
       // window.open needed (the Tampermonkey sandbox swallows those). The
       // relay/authResponse still wires up through window.opener on the page.
-      $(document).on("click", "#account-logout", () => this.logout());
+      $(document).on("click", "#account-status-logout", (e) => {
+        e.preventDefault();
+        this.logout();
+      });
     }
     static ["updateUI"]() {
       if (!this.loggedIn) {
         $("#account-login").show();
-        $("#account-loggedin").hide();
+        $("#account-status-info").text("Anonymous");
+        $("#account-status-logout").hide();
         return;
       }
       $("#account-login").hide();
-      $("#account-loggedin").show();
-      $("#account-name").text(this.nick || (this.uuid.length > 10 ? this.uuid.slice(0, 10) + "..." : this.uuid));
+      const parts = [];
+      parts.push("👤 " + (this.nick || (this.uuid.length > 10 ? this.uuid.slice(0, 10) + "..." : this.uuid)));
+      if (this.isVip()) {
+        parts.push("[VIP]");
+      }
+      parts.push("💰 " + (this.coins || 0).toLocaleString());
+      if (0 < this.sweets) {
+        parts.push("🍬 " + this.sweets.toLocaleString());
+      }
+      if (this.boostActive(this.xpBoost)) {
+        parts.push("⚡ XP Boost");
+      } else if (this.boostActive(this.massBoost)) {
+        parts.push("⚡ Mass Boost");
+      }
+      $("#account-status-info").text(parts.join(" │ "));
+      $("#account-status-logout").show();
     }
   }
   class RelayWs {
