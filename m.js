@@ -5542,6 +5542,8 @@
         this.handlePartyCode(aam);
       } else if (87 === ahy) {
         this.handleParty(aam);
+      } else if (88 === ahy && 1 === ii) {
+        this.handleLevel(aam);
       }
       if (86 === ahy && 1 === ii) {
         this.handleChat(aam);
@@ -5573,6 +5575,12 @@
       if (aia && PacketSender.chekConnection(2)) {
         PacketSender.joinParty(fg, 2);
       }
+    }
+    static ["handleLevel"](ajz) {
+      // Opcode 88: server pushes the account's total XP (uint32, little
+      // endian) + optional bonus coins (uint8 flag + uint32). We only need
+      // the XP to track the current level and detect level-ups.
+      Account.setXp(ajz.readUInt32());
     }
     static ["handleParty"](akb) {
       const tc = akb.readUInt16();
@@ -6157,6 +6165,10 @@
       this.nick = localStorage.getItem("active_session_nick") || "";
       this.gameToken = null;
       this.gameTokenAt = 0;
+      this.levels = null;
+      this.xp = -1;
+      this.level = 0;
+      this.levelAnnounced = false;
       window.authResponse = (res) => {
         try {
           this.onAuthResponse(res);
@@ -6169,6 +6181,7 @@
       this.updateUI();
       if (this.loggedIn) {
         this.refreshGameToken();
+        this.loadLevels();
       }
     }
     static get ["loggedIn"]() {
@@ -6213,9 +6226,15 @@
       }
       this.gameToken = null;
       this.gameTokenAt = 0;
+      this.levels = (e && e.Shop && e.Shop.Levels) || this.levels;
       this.refreshGameToken();
       this.updateUI();
       PacketSender.resendLogin();
+      const axp = parseInt(e && e.XP);
+      if (!isNaN(axp) && 0 <= axp) {
+        this.setXp(axp);
+      }
+      this.loadLevels();
     }
     static ["refreshGameToken"]() {
       if (!this.loggedIn) {
@@ -6245,6 +6264,60 @@
           }
         })
         .catch(() => {});
+    }
+    static ["loadLevels"]() {
+      // Level thresholds come from the account's Shop.Levels table. Prefer
+      // what php/Auth.php returns in authResponse; fall back to auth/me.
+      if (!this.loggedIn) return;
+      if (this.levels && this.levels.length) {
+        this.announceLevel();
+        return;
+      }
+      fetch("https://3rb.io/api/auth/me", { credentials: "include" })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error("status " + r.status))))
+        .then((d) => {
+          const body = d && d.data ? d.data : d;
+          const lv = body && body.Shop && body.Shop.Levels;
+          if (lv && lv.length) {
+            this.levels = lv;
+            const bxp = parseInt(body.XP);
+            if (!isNaN(bxp) && 0 <= bxp) {
+              this.setXp(bxp);
+            }
+          }
+          this.announceLevel();
+        })
+        .catch(() => {});
+    }
+    static ["levelForXp"](xp) {
+      let cur = null;
+      for (let i = 0; i < this.levels.length; i++) {
+        if (this.levels[i].XP <= xp) {
+          cur = this.levels[i];
+        } else {
+          break;
+        }
+      }
+      return cur;
+    }
+    static ["setXp"](xp) {
+      if (0 > xp || !this.levels || !this.levels.length) return;
+      const wasKnown = 0 <= this.xp;
+      const oldLevel = this.level;
+      this.xp = xp;
+      const cur = this.levelForXp(xp);
+      if (!cur) return;
+      this.level = cur.Level;
+      if (wasKnown && oldLevel && cur.Level > oldLevel) {
+        Notifications.command("Level", "Level Up! You reached level " + cur.Level);
+      }
+      this.announceLevel();
+    }
+    static ["announceLevel"]() {
+      if (!this.levels || !this.levels.length) return;
+      if (this.levelAnnounced || 0 > this.xp) return;
+      this.levelAnnounced = true;
+      Notifications.command("Level", "Your level: " + this.level + " (" + this.xp + " XP)");
     }
     static ["logout"]() {
       this.uuid = "logout";
