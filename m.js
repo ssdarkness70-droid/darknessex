@@ -6255,8 +6255,10 @@
       PacketSender.resendLogin();
     }
     static ["bindUI"]() {
-      $(document).on("click", "#account-login-google", () => this.openLogin("google"));
-      $(document).on("click", "#account-login-discord", () => this.openLogin("discord"));
+      // Google/Discord login are native anchors (href + target="_blank" +
+      // rel="opener") so the browser opens the Auth.php popup itself - no
+      // window.open needed (the Tampermonkey sandbox swallows those). The
+      // relay/authResponse still wires up through window.opener on the page.
       $(document).on("click", "#account-logout", () => this.logout());
     }
     static ["updateUI"]() {
