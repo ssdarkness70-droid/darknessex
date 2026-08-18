@@ -2914,7 +2914,12 @@
 
             #account-box .account-btn {
                 cursor: pointer;
+                display: inline-block;
                 height: 30px;
+                line-height: 30px;
+                padding: 0 10px;
+                text-align: center;
+                text-decoration: none;
                 background: #555;
                 border: 0;
                 font-weight: 300;
@@ -3323,8 +3328,8 @@
                     <button id="leave-party" title="Leave the current party" style="display: none;">Leave</button>
                     <div id="account-box">
                         <div id="account-login">
-                            <button class="account-btn google" title="Login with Google">Google</button>
-                            <button class="account-btn discord" title="Login with Discord">Discord</button>
+                            <a class="account-btn google" href="php/Auth.php?provider=google" target="_blank" rel="opener" title="Login with Google">Google</a>
+                            <a class="account-btn discord" href="php/Auth.php?provider=discord" target="_blank" rel="opener" title="Login with Discord">Discord</a>
                         </div>
                         <div id="account-loggedin" style="display: none;">
                             <span id="account-name"></span>
