@@ -651,6 +651,7 @@
       let abs = Storage.get("profiles", "profile" + this.selected);
       const alt = {
         nick: "profile " + this.selected,
+        nick2: "",
         skin: "https://i.imgur.com/nRqSis7.png",
         skin2: "",
         arbSkin: "",
@@ -660,6 +661,8 @@
       }
       Storage.set("profiles", "profile" + this.selected, abs);
       $("#nick").val(abs.nick);
+      $("#nick2").val(abs.nick2 || "");
+      Player.nick2 = abs.nick2 || "";
       $("#skin").val(abs.skin);
       $("#skin2").val(abs.skin2 || "");
       $("#tag").val(this.tag);
@@ -703,6 +706,9 @@
       $("#nick").blur(() => {
         this.setNick($("#nick").val());
       });
+      $("#nick2").blur(() => {
+        this.setNick2($("#nick2").val());
+      });
       $("#arbSkin").blur(() => {
         this.setarbSkin();
       });
@@ -741,6 +747,7 @@
       let ze = Storage.get("profiles", "profile" + acx);
       const nw = {
         nick: "profile " + this.selected,
+        nick2: "",
         skin: "https://i.imgur.com/nRqSis7.png",
         skin2: "",
         arbSkin: "",
@@ -749,6 +756,8 @@
         ze = nw;
       }
       $("#nick").val(ze.nick);
+      $("#nick2").val(ze.nick2 || "");
+      Player.nick2 = ze.nick2 || "";
       $("#skin").val(ze.skin);
       $("#skin2").val(ze.skin2 || "");
       $("#arbSkin").val(ze.arbSkin);
@@ -766,6 +775,7 @@
       let ht = Storage.get("profiles", "profile" + this.selected);
       const o = {
         nick: "profile " + this.selected,
+        nick2: "",
         skin: "https://i.imgur.com/nRqSis7.png",
         skin2: "",
         arbSkin: "",
@@ -776,6 +786,22 @@
       ht.nick = jl;
       Storage.set("profiles", "profile" + this.selected, ht);
       Player.nick = "" === jl ? "An unnamed cell" : jl;
+    }
+    static ["setNick2"](jl) {
+      let ht = Storage.get("profiles", "profile" + this.selected);
+      const o = {
+        nick: "profile " + this.selected,
+        nick2: "",
+        skin: "https://i.imgur.com/nRqSis7.png",
+        skin2: "",
+        arbSkin: "",
+      };
+      if (!ht) {
+        ht = o;
+      }
+      ht.nick2 = jl;
+      Storage.set("profiles", "profile" + this.selected, ht);
+      Player.nick2 = jl;
     }
     static ["setarbSkin"]() {
       var uu = $("#arbSkin").val();
@@ -3609,6 +3635,7 @@
         y: 0x64,
       };
       this._nick = $("#nick").val();
+      this.nick2 = $("#nick2").val();
       this._arbSkin = $("#arbSkin").val();
       this._skin = Renderer.getImgurCode($("#skin").val());
       this._skin2 = Renderer.getImgurCode($("#skin2").val());
@@ -6081,10 +6108,11 @@
       const n = bTab || Player.typeID;
       if (this.chekConnection(n) && ((1 === n && !Player._isAlive) || (2 === n && !Player._isAlive2))) {
         Camera.isSpectating = false;
-        if ("" === Player.nick) {
+        if (1 === n && "" === Player.nick) {
           Player.nick = "An unnamed cell";
         }
-        let xt = unescape(encodeURIComponent(Player.nick));
+        const pnick = 1 === n ? Player.nick : Player.nick2;
+        let xt = unescape(encodeURIComponent(pnick || "An unnamed cell"));
         let h = unescape(encodeURIComponent("free/" + TeamList.arbSkin));
         const ul = {
           n: xt,
