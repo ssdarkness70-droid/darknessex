@@ -5941,8 +5941,11 @@
       // Guest (no account) sends an empty string -> [255, 0, 0], which is
       // byte-for-byte what the old client always sent. A logged-in account
       // sends [255, unicode(uuid|gameToken), 0, 0].
-      const str = Account.buildLoginString(Account.uuid);
-      console.log("Drag+ Login packet: " + (str ? (str.length > 24 ? str.slice(0, 24) + "..." : str) : "guest"));
+      // Only Tab 1 carries the account: the game server allows a single
+      // connection per account (concurrent-login protection), so Tabs 2/3
+      // must stay guests or they get kicked in a reconnect loop.
+      const str = 1 === Number(ahn) ? Account.buildLoginString(Account.uuid) : "";
+      console.log("Drag+ Login packet (tab " + ahn + "): " + (str ? (str.length > 24 ? str.slice(0, 24) + "..." : str) : "guest"));
       if (!str) {
         const px = new Uint8Array([255, 0, 0]);
         WsConnection.send(px, ahn);
@@ -6006,6 +6009,15 @@
       if (command === "/kill" || command === "/recycle") {
         WsConnection.recycleActiveCell();
         return;
+      }
+      // Only Tab 1 carries the logged-in account, so route chat there
+      // (guests on Tabs 2/3 get rejected by the server anyway). Fall back
+      // to the active tab if Tab 1 is not currently connected.
+      if (Account.loggedIn) {
+        jj = 1;
+        if (!this.chekConnection(jj)) {
+          jj = Player.typeID;
+        }
       }
       if (this.chekConnection(jj)) {
         const gh = unescape(encodeURIComponent(am));
