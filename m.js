@@ -7361,7 +7361,7 @@
         ? "./res/skins/free/" + this.arbSkin.replace(/free\/|.png/g, "") + ".png"
         : "";
       const k1 = this.skinKey(Player.nick, Player.colorHex);
-      const k2 = this.skinKey(Player.nick, Player.colorHex2);
+      const k2 = this.skinKey(Player.nick2 || "An unnamed cell", Player.colorHex2);
       if (u1) {
         this.skinMap.set(k1, u1);
       } else if (arb) {
