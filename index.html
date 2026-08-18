@@ -2957,18 +2957,29 @@
                 vertical-align: middle
             }
 
-            #account-box #account-logout {
-                cursor: pointer;
-                height: 30px;
-                background: #a33;
-                border: 0;
-                font-weight: 300;
-                border-radius: 2px;
-                font-size: 12px;
+            #account-box #account-status {
+                text-align: center;
+                color: #aaa;
+                font-size: 11px;
                 font-family: ubuntu;
-                color: #fff;
-                margin: 3px;
-                text-transform: uppercase
+                margin: 6px 3px 2px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                direction: ltr;
+                line-height: 1.4
+            }
+
+            #account-box #account-status #account-status-logout {
+                color: #e88;
+                cursor: pointer;
+                text-decoration: none;
+                margin-left: 6px;
+                font-size: 11px
+            }
+
+            #account-box #account-status #account-status-logout:hover {
+                text-decoration: underline
             }
 
             #banner {
@@ -3331,9 +3342,9 @@
                             <a class="account-btn google" href="php/Auth.php?provider=google" target="_blank" rel="opener" title="Login with Google">Google</a>
                             <a class="account-btn discord" href="php/Auth.php?provider=discord" target="_blank" rel="opener" title="Login with Discord">Discord</a>
                         </div>
-                        <div id="account-loggedin" style="display: none;">
-                            <span id="account-name"></span>
-                            <button id="account-logout" title="Log out">Logout</button>
+                        <div id="account-status">
+                            <span id="account-status-info">Anonymous</span>
+                            <a href="#" id="account-status-logout" style="display: none;">Logout</a>
                         </div>
                     </div>
                     <select class="menu-inputs" id="servers">
