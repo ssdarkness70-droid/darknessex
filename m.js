@@ -6222,7 +6222,7 @@
           return r.json();
         })
         .then((d) => {
-          const tk = d && d.data && d.data.token;
+          const tk = d && (d.token || (d.data && d.data.token));
           if (tk) {
             this.gameToken = tk;
             this.gameTokenAt = Date.now();
