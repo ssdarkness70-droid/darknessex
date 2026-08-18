@@ -6171,7 +6171,21 @@
       return this.gameToken ? u + "|" + this.gameToken : u;
     }
     static ["openLogin"](provider) {
-      window.open("php/Auth.php?provider=" + provider, "3rb.io", "scrollbars=yes, width=400, height=520");
+      // Match the game's own popup (createWindow) exactly: same window name
+      // "3rb.io", same "scrollbars=yes, width=..., height=..., top=..., left=..."
+      // features string. window.open from a Tampermonkey sandbox is often a
+      // no-op (silently returns null, nothing opens), so route through the
+      // real page window (unsafeWindow) when available - the popup needs the
+      // real opener so php/Auth.php can call window.opener.authResponse().
+      const w = "undefined" !== typeof unsafeWindow ? unsafeWindow : window;
+      const top = (w.screenTop || w.screenY || 0) + ((w.outerHeight || w.innerHeight || 0) - 520) / 2;
+      const left = (w.screenLeft || w.screenX || 0) + ((w.outerWidth || w.innerWidth || 0) - 400) / 2;
+      const features = "scrollbars=yes, width=400, height=520, top=" + top + ", left=" + left;
+      const win = w.open("php/Auth.php?provider=" + provider, "3rb.io", features);
+      if (!win) {
+        Notifications.warn("Login", "Login popup was blocked - please allow popups for 3rb.io and try again.");
+      }
+      return win;
     }
     static ["onAuthResponse"](e) {
       if (!e || e.error) {
@@ -6241,9 +6255,9 @@
       PacketSender.resendLogin();
     }
     static ["bindUI"]() {
-      $("#account-login-google").click(() => this.openLogin("google"));
-      $("#account-login-discord").click(() => this.openLogin("discord"));
-      $("#account-logout").click(() => this.logout());
+      $(document).on("click", "#account-login-google", () => this.openLogin("google"));
+      $(document).on("click", "#account-login-discord", () => this.openLogin("discord"));
+      $(document).on("click", "#account-logout", () => this.logout());
     }
     static ["updateUI"]() {
       if (!this.loggedIn) {
