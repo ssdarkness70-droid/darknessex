@@ -2451,7 +2451,7 @@
       }
       return fi;
     }
-    static ["gameChat"](dg, zf, ais) {
+    static ["gameChat"](dg, zf, ais, mt) {
       // Build up a nick->id memory from every attributed message we see -
       // the invite notification itself often arrives as a system-style
       // message (id1 <= 0, not attributed to the inviter), and the inviter
@@ -2463,6 +2463,22 @@
         return;
       }
       const akh = this.alert(dg, zf, "game");
+      if (akh) {
+        // Render the sender's real color, a crown for VIPs, and gray for
+        // muted senders - the same fields the real client uses. mt comes
+        // from handleChat's packet parse (opcode 86).
+        const nickEl = akh.find(".nick");
+        if (mt && nickEl.length) {
+          if (mt.muted) {
+            nickEl.css("color", "#7f7f7f");
+          } else if (mt.vip) {
+            nickEl.prepend("👑 ");
+          }
+          if ("number" === typeof mt.r) {
+            nickEl.css("color", "#" + [mt.r, mt.g, mt.b].map((c) => ("0" + c.toString(16)).slice(-2)).join(""));
+          }
+        }
+      }
       if (0 < ais && akh) {
         akh.find(".nick").on("contextmenu", (ahp) => {
           ahp.preventDefault();
@@ -4388,7 +4404,8 @@
         return false;
       }
       let pk = cn.nick.substring(cn.nick.indexOf("}") + 1) || "";
-      const xb = this.nickCaches.get(pk) || this.newNickCache(pk);
+      const key = (cn.vip ? "v:" : "") + pk;
+      const xb = this.nickCaches.get(key) || this.newNickCache(key);
       xb.lastUsedAt = GameLoop.time;
       const gc = 50 > this.getScreenRadius(cn.animRadius) ? 0 : 1;
       const uj = xb.level[gc];
@@ -4398,18 +4415,21 @@
       const ac = this.getNewCanvas();
       const xd = ac.getContext("2d");
       const lx = (50 * (gc + 1) * Theme.cellNickSize) / 100;
+      // VIP cells render their name in gold with a crown, matching the real
+      // client (cell flags bit 256 = vip).
+      const disp = (cn.vip ? "👑" : "") + pk;
       ac.height = 0 | (1.2 * lx);
-      ac.width = 0 | (1.2 * this.getNickWidth(pk, lx));
+      ac.width = 0 | (1.2 * this.getNickWidth(disp, lx));
       xd.font = "700 " + (0 | lx) + "px " + Theme.nickFont;
       xd.textBaseline = "middle";
       xd.textAlign = "center";
       if ("normal" === Settings.nickShadow) {
-        xd.strokeStyle = Theme.nickStrokeColor;
+        xd.strokeStyle = cn.vip ? "#6b4f00" : Theme.nickStrokeColor;
         xd.lineWidth = 6 * (gc + 1);
-        xd.strokeText(pk, ac.width >> 1, ac.height >> 1);
+        xd.strokeText(disp, ac.width >> 1, ac.height >> 1);
       } else {
         if ("performance" === Settings.nickShadow) {
-          xd.fillStyle = Theme.nickStrokeColor;
+          xd.fillStyle = cn.vip ? "#6b4f00" : Theme.nickStrokeColor;
           xd.globalAlpha = 0.75;
           const aga = 0 | (ac.width / 1.2);
           const xj = 0 | (ac.height / 1.2);
@@ -4417,8 +4437,8 @@
           xd.globalAlpha = 1;
         }
       }
-      xd.fillStyle = Theme.nickColor;
-      xd.fillText(pk, ac.width >> 1, ac.height >> 1);
+      xd.fillStyle = cn.vip ? "#fbb040" : Theme.nickColor;
+      xd.fillText(disp, ac.width >> 1, ac.height >> 1);
       xb.level[gc] = ac;
       return ac;
     }
@@ -5641,18 +5661,18 @@
       // right-clicked into the same party-invite menu as a map cell.
       const mz = yn.readInt32();
       yn.readInt32();
-      yn.readUInt8();
+      const vip = yn.readUInt8();
       yn.readStringZeroUtf8();
-      yn.readUInt8();
-      yn.readUInt8();
-      yn.readUInt8();
+      const cr = yn.readUInt8();
+      const cg = yn.readUInt8();
+      const cb2 = yn.readUInt8();
       var cb = yn.readStringZeroUtf8().replace("[]", "");
       var pv = yn.readStringZeroUtf8();
       yn.readStringZeroUtf8();
       yn.readUInt8();
-      yn.readUInt8();
+      const muted = yn.readUInt8();
       yn.readStringZeroUtf8();
-      Notifications.gameChat(cb, pv, mz);
+      Notifications.gameChat(cb, pv, mz, { r: cr, g: cg, b: cb2, vip: !!vip, muted: !!muted });
     }
     static ["worldUpdate"](vi, vd = 1) {
       GameLoop.refreshTime();
@@ -5765,6 +5785,7 @@
         }
         akq.nick = alx ? vi.readStringZeroUtf8() : null;
         akq.bNick = ale ? vi.readStringZeroUtf8() : null;
+        akq.vip = !!(256 & ajl);
         akq.isVirus = sf;
         akq.isEjected = jd;
         // classify AFTER isVirus/isEjected/ownerId are up to date for this
@@ -6092,6 +6113,12 @@
         if (Player.arbSkin) {
           ul.s = h;
           ul.w = "";
+        }
+        // VIP flag: the real client sends v:true in the spawn/Name packet so
+        // the server marks the connection as VIP (gold color + crown on the
+        // cell, isVip on its chat messages). Tab 1 carries the account.
+        if (1 === n && Account.isVip()) {
+          ul.v = true;
         }
         const ur = JSON.stringify(ul);
         const ng = ur.length;
