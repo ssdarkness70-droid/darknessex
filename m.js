@@ -4415,9 +4415,9 @@
       const ac = this.getNewCanvas();
       const xd = ac.getContext("2d");
       const lx = (50 * (gc + 1) * Theme.cellNickSize) / 100;
-      // VIP cells render their name in gold with a crown, matching the real
-      // client (cell flags bit 256 = vip).
-      const disp = (cn.vip ? "👑" : "") + pk;
+      // VIP cells render their name in gold (no crown in-game - the crown
+      // stays in chat), matching the real client (cell flags bit 256 = vip).
+      const disp = pk;
       ac.height = 0 | (1.2 * lx);
       ac.width = 0 | (1.2 * this.getNickWidth(disp, lx));
       xd.font = "700 " + (0 | lx) + "px " + Theme.nickFont;
