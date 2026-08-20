@@ -7393,6 +7393,7 @@
     }
     static ["skinKey"](nick, colorHex) {
       let base = nick.substring(nick.indexOf("}") + 1);
+      base = base.replace(/^\[[^\]]*\]\s*/, "");
       base = base.replace("%*^", "");
       return base + colorHex;
     }
