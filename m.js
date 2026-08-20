@@ -5169,7 +5169,7 @@
     }
     static ["createSocket"](slot) {
       if (!this.ip) return null;
-      const socket = new WebSocket(this.ip, "algamees");
+      const socket = new WebSocket(this.ip, "d1elnjtfbyzq7a");
       if (1 === slot) this.ws = socket;
       else if (2 === slot) this.ws2 = socket;
       else this.ws3 = socket;
